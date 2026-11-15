@@ -1,0 +1,2163 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AETHERA — Planetary Systems & Climate Trend Observatory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/globe.gl@2.32.1/dist/globe.gl.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <style>
+         :root {
+             --bg-deep: #03050a;
+             --bg-panel: rgba(10, 14, 24, 0.78);
+             --bg-panel-hover: rgba(16, 22, 36, 0.92);
+             --border-subtle: rgba(255, 255, 255, 0.08);
+             --border-bright: rgba(255, 255, 255, 0.22);
+             --text-primary: #f8fafc;
+             --text-secondary: #94a3b8;
+             --text-muted: #566074;
+             --accent: #38bdf8;
+         }
+
+         * {
+             box-sizing: border-box;
+             margin: 0;
+             padding: 0;
+         }
+
+         html {
+             scroll-behavior: smooth;
+         }
+
+         body {
+             background-color: var(--bg-deep);
+             color: var(--text-primary);
+             font-family: 'Inter', -apple-system, sans-serif;
+             overflow-x: hidden;
+             line-height: 1.65;
+             -webkit-font-smoothing: antialiased;
+         }
+
+         /* MULTI-LAYER SPACE BACKGROUND CANVAS */
+         #spaceCanvas {
+             position: fixed;
+             inset: 0;
+             width: 100%;
+             height: 100%;
+             pointer-events: none;
+             z-index: 0;
+         }
+
+         .grid-overlay {
+             position: fixed;
+             inset: 0;
+             background-image: linear-gradient(to right, rgba(255, 255, 255, 0.014) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.014) 1px, transparent 1px);
+             background-size: 100px 100px;
+             mask-image: radial-gradient(circle at 50% 40%, black 35%, transparent 90%);
+             -webkit-mask-image: radial-gradient(circle at 50% 40%, black 35%, transparent 90%);
+             pointer-events: none;
+             z-index: 0;
+         }
+
+         /* STICKY NAVIGATION BAR */
+         .navbar {
+             position: sticky;
+             top: 0;
+             z-index: 100;
+             height: 70px;
+             background: rgba(3, 5, 10, 0.82);
+             backdrop-filter: blur(20px);
+             border-bottom: 1px solid var(--border-subtle);
+             display: flex;
+             align-items: center;
+             justify-content: space-between;
+             padding: 0 56px;
+         }
+
+         .brand {
+             display: flex;
+             align-items: center;
+             gap: 14px;
+             text-decoration: none;
+             color: var(--text-primary);
+         }
+
+         .brand-orb {
+             width: 28px;
+             height: 28px;
+             border-radius: 50%;
+             border: 1px solid rgba(56, 189, 248, 0.5);
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);
+             position: relative;
+         }
+
+             .brand-orb::after {
+                 content: "";
+                 width: 7px;
+                 height: 7px;
+                 border-radius: 50%;
+                 background: var(--accent);
+                 box-shadow: 0 0 10px var(--accent);
+             }
+
+         .brand-title {
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 15px;
+             font-weight: 700;
+             letter-spacing: 3.5px;
+             text-transform: uppercase;
+         }
+
+         .nav-links {
+             display: flex;
+             align-items: center;
+             gap: 36px;
+         }
+
+         .nav-anchor {
+             color: var(--text-secondary);
+             text-decoration: none;
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 13px;
+             font-weight: 500;
+             letter-spacing: 0.6px;
+             transition: color 0.2s;
+         }
+
+             .nav-anchor:hover {
+                 color: #ffffff;
+             }
+
+         .nav-cta {
+             padding: 9px 20px;
+             border-radius: 100px;
+             border: 1px solid rgba(56, 189, 248, 0.45);
+             background: rgba(56, 189, 248, 0.1);
+             color: #ffffff;
+             text-decoration: none;
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 12px;
+             font-weight: 600;
+             letter-spacing: 1px;
+             text-transform: uppercase;
+             transition: all 0.25s ease;
+         }
+
+             .nav-cta:hover {
+                 background: rgba(56, 189, 248, 0.24);
+                 box-shadow: 0 0 22px rgba(56, 189, 248, 0.35);
+             }
+
+         /* =====================================================================
+        SECTION 1: GRAND CENTERED SPACE HERO BANNER + PANORAMIC TELEMETRY HUD
+        ===================================================================== */
+         .hero-banner {
+             position: relative;
+             z-index: 1;
+             max-width: 1560px;
+             margin: 0 auto;
+             padding: 56px 56px 48px;
+             display: flex;
+             flex-direction: column;
+             gap: 44px;
+         }
+
+         /* Monumental Centered Banner Container */
+         .center-banner-frame {
+             position: relative;
+             border-radius: 28px;
+             border: 1px solid rgba(255, 255, 255, 0.1);
+             background: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.16) 0%, rgba(15, 23, 42, 0.45) 45%, rgba(6, 9, 18, 0.85) 100%);
+             backdrop-filter: blur(16px);
+             padding: 68px 48px 44px;
+             text-align: center;
+             overflow: hidden;
+             display: flex;
+             flex-direction: column;
+             align-items: center;
+             box-shadow: 0 30px 90px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+         }
+
+         /* Animated Rotating Astrolabe / Orbital Rings behind the Centered Banner */
+         .banner-orbit-ring-1 {
+             position: absolute;
+             top: 50%;
+             left: 50%;
+             width: 680px;
+             height: 680px;
+             margin-top: -340px;
+             margin-left: -340px;
+             border-radius: 50%;
+             border: 1px dashed rgba(56, 189, 248, 0.16);
+             animation: spinSlow 70s linear infinite;
+             pointer-events: none;
+         }
+
+         .banner-orbit-ring-2 {
+             position: absolute;
+             top: 50%;
+             left: 50%;
+             width: 920px;
+             height: 920px;
+             margin-top: -460px;
+             margin-left: -460px;
+             border-radius: 50%;
+             border: 1px solid rgba(168, 85, 247, 0.12);
+             animation: spinReverse 95s linear infinite;
+             pointer-events: none;
+         }
+
+             .banner-orbit-ring-2::before {
+                 content: "";
+                 position: absolute;
+                 top: -4px;
+                 left: 50%;
+                 width: 8px;
+                 height: 8px;
+                 border-radius: 50%;
+                 background: #38bdf8;
+                 box-shadow: 0 0 14px #38bdf8;
+             }
+         /* Glowing Planetary Horizon Curve at the bottom of the Banner */
+         .banner-horizon-glow {
+             position: absolute;
+             bottom: -260px;
+             left: 50%;
+             transform: translateX(-50%);
+             width: 1200px;
+             height: 320px;
+             border-radius: 50%;
+             background: radial-gradient(ellipse at center, rgba(56, 189, 248, 0.25) 0%, rgba(56, 189, 248, 0) 70%);
+             border-top: 1px solid rgba(56, 189, 248, 0.35);
+             pointer-events: none;
+         }
+
+         @keyframes spinSlow {
+             from {
+                 transform: rotate(0deg);
+             }
+
+             to {
+                 transform: rotate(360deg);
+             }
+         }
+
+         @keyframes spinReverse {
+             from {
+                 transform: rotate(360deg);
+             }
+
+             to {
+                 transform: rotate(0deg);
+             }
+         }
+
+         .mission-eyebrow {
+             position: relative;
+             z-index: 2;
+             display: inline-flex;
+             align-items: center;
+             gap: 10px;
+             padding: 6px 16px;
+             border-radius: 100px;
+             background: rgba(56, 189, 248, 0.08);
+             border: 1px solid rgba(56, 189, 248, 0.28);
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 11px;
+             letter-spacing: 2.2px;
+             text-transform: uppercase;
+             color: #7dd3fc;
+             margin-bottom: 24px;
+         }
+
+         .eyebrow-pulse {
+             width: 6px;
+             height: 6px;
+             border-radius: 50%;
+             background: #38bdf8;
+             box-shadow: 0 0 10px #38bdf8;
+             animation: pulseGlow 2s infinite ease-in-out;
+         }
+
+         @keyframes pulseGlow {
+             0%, 100% {
+                 opacity: 1;
+                 transform: scale(1);
+             }
+
+             50% {
+                 opacity: 0.4;
+                 transform: scale(0.8);
+             }
+         }
+
+         .hero-display-title {
+             position: relative;
+             z-index: 2;
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: clamp(52px, 6.2vw, 88px);
+             font-weight: 700;
+             line-height: 1.0;
+             letter-spacing: -2.5px;
+             color: #ffffff;
+             text-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+         }
+
+         .hero-display-subtitle {
+             position: relative;
+             z-index: 2;
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: clamp(20px, 2.3vw, 32px);
+             font-weight: 300;
+             color: #cbd5e1;
+             letter-spacing: -0.5px;
+             margin-top: 10px;
+         }
+
+         .hero-description {
+             position: relative;
+             z-index: 2;
+             margin-top: 22px;
+             font-size: 16px;
+             color: var(--text-secondary);
+             max-width: 760px;
+             line-height: 1.75;
+         }
+
+         .hero-actions {
+             position: relative;
+             z-index: 2;
+             margin-top: 32px;
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             gap: 18px;
+             flex-wrap: wrap;
+         }
+
+         .btn-primary-launch {
+             display: inline-flex;
+             align-items: center;
+             gap: 12px;
+             padding: 15px 32px;
+             border-radius: 100px;
+             background: #ffffff;
+             color: #03050a;
+             text-decoration: none;
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 14px;
+             font-weight: 600;
+             letter-spacing: 0.4px;
+             transition: transform 0.2s, box-shadow 0.25s;
+         }
+
+             .btn-primary-launch:hover {
+                 transform: translateY(-2px);
+                 box-shadow: 0 12px 32px rgba(255, 255, 255, 0.25);
+             }
+
+         .btn-secondary-link {
+             display: inline-flex;
+             align-items: center;
+             gap: 10px;
+             padding: 14px 26px;
+             border-radius: 100px;
+             border: 1px solid var(--border-bright);
+             background: rgba(255, 255, 255, 0.04);
+             color: var(--text-primary);
+             text-decoration: none;
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 13.5px;
+             font-weight: 500;
+             transition: border-color 0.2s, background 0.2s;
+         }
+
+             .btn-secondary-link:hover {
+                 border-color: #38bdf8;
+                 background: rgba(56, 189, 248, 0.1);
+             }
+
+         /* REDESIGNED OBSERVATORY TELEMETRY: SLEEK HORIZONTAL HUD RIBBON */
+         .telemetry-hud-ribbon {
+             position: relative;
+             z-index: 2;
+             width: 100%;
+             max-width: 1180px;
+             margin-top: 44px;
+             background: rgba(6, 10, 20, 0.82);
+             border: 1px solid rgba(255, 255, 255, 0.1);
+             border-radius: 18px;
+             padding: 18px 28px;
+             display: flex;
+             align-items: center;
+             justify-content: space-between;
+             flex-wrap: wrap;
+             gap: 20px;
+             backdrop-filter: blur(14px);
+         }
+
+         .hud-segment {
+             display: flex;
+             align-items: center;
+             gap: 14px;
+             text-align: left;
+         }
+
+         .hud-divider {
+             width: 1px;
+             height: 36px;
+             background: rgba(255, 255, 255, 0.08);
+         }
+
+         .hud-val {
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 24px;
+             font-weight: 600;
+             color: #ffffff;
+             line-height: 1;
+         }
+
+         .hud-lbl {
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 10px;
+             text-transform: uppercase;
+             letter-spacing: 1.2px;
+             color: var(--text-secondary);
+             margin-top: 4px;
+         }
+
+         .hud-live-box {
+             display: flex;
+             flex-direction: column;
+             align-items: flex-end;
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 11px;
+         }
+
+         .hud-live-status {
+             display: inline-flex;
+             align-items: center;
+             gap: 7px;
+             color: #10b981;
+             font-weight: 500;
+         }
+
+             .hud-live-status::before {
+                 content: "";
+                 width: 7px;
+                 height: 7px;
+                 border-radius: 50%;
+                 background: #10b981;
+                 box-shadow: 0 0 10px #10b981;
+             }
+
+         .hud-clock {
+             color: var(--text-secondary);
+             font-size: 10.5px;
+             margin-top: 3px;
+         }
+
+         /* Three Pillars Grid below the Centered Banner */
+         .pillars-grid {
+             display: grid;
+             grid-template-columns: repeat(3, 1fr);
+             gap: 24px;
+         }
+
+         .pillar-card {
+             background: var(--bg-panel);
+             backdrop-filter: blur(14px);
+             border: 1px solid var(--border-subtle);
+             border-radius: 16px;
+             padding: 26px 28px;
+             display: flex;
+             flex-direction: column;
+             gap: 10px;
+             transition: border-color 0.25s, transform 0.25s;
+         }
+
+             .pillar-card:hover {
+                 border-color: var(--border-bright);
+                 transform: translateY(-3px);
+             }
+
+         .pillar-num {
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 11px;
+             letter-spacing: 2px;
+             text-transform: uppercase;
+             color: #38bdf8;
+         }
+
+         .pillar-title {
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 19px;
+             font-weight: 600;
+             color: #ffffff;
+         }
+
+         .pillar-desc {
+             font-size: 13.5px;
+             color: var(--text-secondary);
+             line-height: 1.7;
+         }
+
+         /* =====================================================================
+        SECTION 2: INTERACTIVE 3D EARTH OBSERVATORY (FIXED DOCKED CONTROLS)
+        ===================================================================== */
+         .observatory-section {
+             position: relative;
+             z-index: 1;
+             max-width: 1560px;
+             margin: 0 auto;
+             padding: 56px 56px 40px;
+             border-top: 1px solid var(--border-subtle);
+         }
+
+         .explorer-toolbar {
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+             flex-wrap: wrap;
+             gap: 20px;
+             padding-bottom: 24px;
+             border-bottom: 1px solid var(--border-subtle);
+             margin-bottom: 32px;
+         }
+
+         .region-tabs {
+             display: flex;
+             gap: 10px;
+             flex-wrap: wrap;
+         }
+
+         .region-tab {
+             background: var(--bg-panel);
+             border: 1px solid var(--border-subtle);
+             color: var(--text-secondary);
+             padding: 10px 20px;
+             border-radius: 100px;
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 13.5px;
+             font-weight: 500;
+             cursor: pointer;
+             display: flex;
+             align-items: center;
+             gap: 9px;
+             transition: all 0.25s ease;
+         }
+
+             .region-tab .idx {
+                 font-family: 'JetBrains Mono', monospace;
+                 font-size: 10.5px;
+                 color: var(--text-muted);
+             }
+
+             .region-tab:hover {
+                 border-color: var(--border-bright);
+                 color: #ffffff;
+             }
+
+             .region-tab.active {
+                 background: rgba(255, 255, 255, 0.08);
+                 border-color: var(--accent);
+                 color: #ffffff;
+                 box-shadow: 0 0 20px rgba(56, 189, 248, 0.18);
+             }
+
+                 .region-tab.active .idx {
+                     color: var(--accent);
+                 }
+
+         .view-modes {
+             display: flex;
+             background: var(--bg-panel);
+             border: 1px solid var(--border-subtle);
+             border-radius: 100px;
+             padding: 4px;
+         }
+
+         .view-btn {
+             background: transparent;
+             border: none;
+             color: var(--text-secondary);
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 11px;
+             padding: 7px 16px;
+             border-radius: 100px;
+             cursor: pointer;
+             transition: 0.2s;
+         }
+
+             .view-btn.active {
+                 background: #ffffff;
+                 color: #03050a;
+                 font-weight: 500;
+             }
+
+         .globe-grid {
+             display: grid;
+             grid-template-columns: 400px 1fr;
+             gap: 40px;
+             align-items: center;
+         }
+
+         .control-column {
+             display: flex;
+             flex-direction: column;
+             gap: 24px;
+         }
+
+         .sector-tag {
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 11px;
+             letter-spacing: 2px;
+             text-transform: uppercase;
+             color: var(--accent);
+             display: flex;
+             align-items: center;
+             gap: 10px;
+         }
+
+             .sector-tag::before {
+                 content: "";
+                 width: 22px;
+                 height: 1px;
+                 background: var(--accent);
+             }
+
+         .active-region-heading {
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 50px;
+             font-weight: 600;
+             letter-spacing: -1.2px;
+             line-height: 1.05;
+             margin-top: 8px;
+         }
+
+         .meta-strip {
+             display: flex;
+             flex-direction: column;
+             gap: 6px;
+             padding: 14px 16px;
+             border-radius: 12px;
+             background: var(--bg-panel);
+             border: 1px solid var(--border-subtle);
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 11px;
+             color: var(--text-secondary);
+         }
+
+             .meta-strip span b {
+                 color: #ffffff;
+                 font-weight: 500;
+             }
+
+         .params-group-label {
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 10.5px;
+             letter-spacing: 1.8px;
+             text-transform: uppercase;
+             color: var(--text-secondary);
+         }
+
+         .params-stack {
+             display: flex;
+             flex-direction: column;
+             gap: 10px;
+         }
+
+         .param-card {
+             display: flex;
+             align-items: center;
+             justify-content: space-between;
+             padding: 14px 16px;
+             border-radius: 12px;
+             background: var(--bg-panel);
+             border: 1px solid var(--border-subtle);
+             cursor: pointer;
+             transition: all 0.2s ease;
+         }
+
+             .param-card:hover {
+                 background: var(--bg-panel-hover);
+                 border-color: var(--border-bright);
+                 transform: translateX(3px);
+             }
+
+             .param-card.selected {
+                 border-color: var(--p-color);
+                 background: linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0%, rgba(12, 16, 26, 0.88) 100%);
+             }
+
+         .param-card-left {
+             display: flex;
+             align-items: center;
+             gap: 13px;
+         }
+
+         .param-indicator {
+             width: 9px;
+             height: 9px;
+             border-radius: 50%;
+             background: var(--p-color);
+             opacity: 0.25;
+             transition: 0.25s;
+         }
+
+         .param-card.selected .param-indicator {
+             opacity: 1;
+             box-shadow: 0 0 12px var(--p-color);
+         }
+
+         .param-card-title {
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 14.5px;
+             font-weight: 500;
+             color: var(--text-primary);
+         }
+
+         .param-card-meta {
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 10.5px;
+             color: var(--text-muted);
+             margin-top: 2px;
+         }
+
+         .map-layer-pill {
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 10px;
+             letter-spacing: 0.8px;
+             text-transform: uppercase;
+             padding: 5px 11px;
+             border-radius: 100px;
+             border: 1px solid var(--border-subtle);
+             background: rgba(255, 255, 255, 0.03);
+             color: var(--text-secondary);
+             cursor: pointer;
+             transition: 0.2s;
+         }
+
+             .map-layer-pill:hover,
+             .map-layer-pill.active-layer {
+                 border-color: var(--p-color);
+                 color: #ffffff;
+                 background: rgba(255, 255, 255, 0.08);
+             }
+
+         .bottom-tools-row {
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+             gap: 12px;
+         }
+
+         .tool-link {
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 12.5px;
+             font-weight: 500;
+             color: var(--text-secondary);
+             text-decoration: none;
+             cursor: pointer;
+             display: inline-flex;
+             align-items: center;
+             gap: 8px;
+             padding: 9px 14px;
+             border-radius: 10px;
+             background: var(--bg-panel);
+             border: 1px solid var(--border-subtle);
+             transition: 0.2s;
+         }
+
+             .tool-link:hover {
+                 color: #ffffff;
+                 border-color: var(--border-bright);
+             }
+
+         /* 3D GLOBE STAGE — CENTERED WITH DOCKED CONTROLS RIGHT UNDER THE SPHERE */
+         .globe-stage {
+             position: relative;
+             height: 750px;
+             width: 100%;
+             max-width: 860px;
+             margin: 0 auto;
+             display: flex;
+             align-items: center;
+             justify-content: center;
+         }
+
+         .orbit-ring-inner {
+             position: absolute;
+             width: 610px;
+             height: 610px;
+             border-radius: 50%;
+             border: 1px dashed rgba(255, 255, 255, 0.09);
+             pointer-events: none;
+             z-index: 1;
+         }
+
+         .orbit-ring-outer {
+             position: absolute;
+             width: 680px;
+             height: 680px;
+             border-radius: 50%;
+             border: 1px solid rgba(56, 189, 248, 0.1);
+             pointer-events: none;
+             z-index: 1;
+         }
+
+         #globeViz {
+             width: 100%;
+             height: 100%;
+             z-index: 2;
+             cursor: grab;
+         }
+
+             #globeViz:active {
+                 cursor: grabbing;
+             }
+
+         /* Top-Centered Surface Legend directly above the North Pole of the Globe */
+         .surface-legend {
+             position: absolute;
+             top: 6px;
+             left: 50%;
+             transform: translateX(-50%);
+             z-index: 10;
+             background: rgba(8, 12, 22, 0.85);
+             backdrop-filter: blur(14px);
+             border: 1px solid var(--border-subtle);
+             border-radius: 100px;
+             padding: 8px 22px;
+             display: flex;
+             align-items: center;
+             gap: 16px;
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 10.5px;
+             color: var(--text-secondary);
+             white-space: nowrap;
+             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+         }
+
+         .legend-gradient {
+             width: 130px;
+             height: 6px;
+             border-radius: 4px;
+             background: linear-gradient(90deg, #1d4ed8, #38bdf8, #2ec4b6, #facc15, #dc2626);
+         }
+
+         .legend-ticks {
+             display: flex;
+             gap: 10px;
+             color: #cbd5e1;
+         }
+
+         /* Unified Orbital Control Dock directly underneath the Globe Sphere */
+         .orbit-controls-dock {
+             position: absolute;
+             bottom: 8px;
+             left: 50%;
+             transform: translateX(-50%);
+             z-index: 10;
+             display: flex;
+             align-items: center;
+             gap: 18px;
+             background: rgba(8, 12, 22, 0.88);
+             backdrop-filter: blur(16px);
+             border: 1px solid rgba(255, 255, 255, 0.12);
+             padding: 10px 22px;
+             border-radius: 100px;
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 11px;
+             color: var(--text-secondary);
+             white-space: nowrap;
+             box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65);
+         }
+
+         .dock-btn {
+             background: rgba(255, 255, 255, 0.06);
+             border: 1px solid rgba(255, 255, 255, 0.14);
+             color: #ffffff;
+             font-family: inherit;
+             font-size: 10.5px;
+             padding: 5px 12px;
+             border-radius: 100px;
+             cursor: pointer;
+             transition: 0.2s;
+         }
+
+             .dock-btn:hover,
+             .dock-btn.active-dock {
+                 border-color: var(--accent);
+                 background: rgba(56, 189, 248, 0.16);
+             }
+
+         .dock-slider-item {
+             display: flex;
+             align-items: center;
+             gap: 8px;
+         }
+
+             .dock-slider-item input[type="range"] {
+                 width: 68px;
+                 height: 4px;
+                 accent-color: #38bdf8;
+                 cursor: pointer;
+             }
+
+         .dock-sep {
+             width: 1px;
+             height: 18px;
+             background: rgba(255, 255, 255, 0.1);
+         }
+
+         /* Clickable 3D Pins on the Globe */
+         .globe-pin {
+             display: flex;
+             align-items: center;
+             gap: 8px;
+             transform: translate(8px, -50%);
+             cursor: pointer;
+             pointer-events: auto;
+         }
+
+         .globe-pin-dot {
+             width: 8px;
+             height: 8px;
+             border-radius: 50%;
+             background: var(--pin-color, #38bdf8);
+             box-shadow: 0 0 12px var(--pin-color, #38bdf8);
+         }
+
+         .globe-pin-tag {
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 10.5px;
+             font-weight: 500;
+             letter-spacing: 1.2px;
+             text-transform: uppercase;
+             color: #ffffff;
+             background: rgba(6, 9, 18, 0.84);
+             border: 1px solid rgba(255, 255, 255, 0.2);
+             padding: 4px 10px;
+             border-radius: 6px;
+             white-space: nowrap;
+             transition: transform 0.2s, border-color 0.2s;
+         }
+
+         .globe-pin:hover .globe-pin-tag {
+             border-color: var(--pin-color, #38bdf8);
+             transform: scale(1.05);
+         }
+
+         /* =====================================================================
+        SECTION 3: TIME SERIES CHARTS & STATISTICAL BREAKDOWN
+        ===================================================================== */
+         .analysis-section {
+             position: relative;
+             z-index: 1;
+             max-width: 1560px;
+             margin: 0 auto;
+             padding: 56px 56px 120px;
+             border-top: 1px solid var(--border-subtle);
+             display: flex;
+             flex-direction: column;
+             gap: 44px;
+         }
+
+         .dossier-card {
+             display: grid;
+             grid-template-columns: 340px 1fr 360px;
+             gap: 36px;
+             align-items: start;
+             padding: 32px 36px;
+             background: var(--bg-panel);
+             backdrop-filter: blur(14px);
+             border: 1px solid var(--border-subtle);
+             border-radius: 18px;
+         }
+
+         .dossier-title {
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 28px;
+             font-weight: 600;
+             margin-top: 6px;
+         }
+
+         .dossier-text {
+             font-size: 14.5px;
+             color: #cbd5e1;
+             line-height: 1.78;
+         }
+
+         .dossier-finding {
+             border-left: 2px solid var(--accent);
+             padding-left: 18px;
+             display: flex;
+             flex-direction: column;
+             gap: 6px;
+         }
+
+         .chart-card {
+             background: var(--bg-panel);
+             backdrop-filter: blur(14px);
+             border: 1px solid var(--border-subtle);
+             border-radius: 18px;
+             padding: 28px 32px;
+             display: flex;
+             flex-direction: column;
+             gap: 20px;
+         }
+
+         .chart-card-header {
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+             flex-wrap: wrap;
+             gap: 16px;
+         }
+
+             .chart-card-header h3 {
+                 font-family: 'Space Grotesk', sans-serif;
+                 font-size: 22px;
+                 font-weight: 600;
+             }
+
+             .chart-card-header p {
+                 font-size: 13px;
+                 color: var(--text-secondary);
+                 margin-top: 3px;
+             }
+
+         .pill-toggles {
+             display: flex;
+             gap: 10px;
+             flex-wrap: wrap;
+         }
+
+         .pill-toggle {
+             background: rgba(255, 255, 255, 0.03);
+             border: 1px solid var(--border-subtle);
+             color: var(--text-secondary);
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 11px;
+             padding: 8px 15px;
+             border-radius: 100px;
+             cursor: pointer;
+             transition: 0.2s;
+         }
+
+             .pill-toggle:hover {
+                 border-color: var(--border-bright);
+                 color: #ffffff;
+             }
+
+             .pill-toggle.active {
+                 background: rgba(56, 189, 248, 0.14);
+                 border-color: var(--accent);
+                 color: #ffffff;
+             }
+
+         .cards-grid {
+             display: grid;
+             grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+             gap: 24px;
+         }
+
+         .stat-detail-card {
+             background: var(--bg-panel);
+             backdrop-filter: blur(14px);
+             border: 1px solid var(--border-subtle);
+             border-top: 3px solid var(--c-color, #38bdf8);
+             border-radius: 16px;
+             padding: 26px;
+             display: flex;
+             flex-direction: column;
+             gap: 16px;
+         }
+
+         .stat-card-top {
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+             gap: 10px;
+         }
+
+         .stat-card-title {
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 18px;
+             font-weight: 600;
+         }
+
+         .stat-sensor-badge {
+             font-family: 'JetBrains Mono', monospace;
+             font-size: 10px;
+             padding: 4px 9px;
+             border-radius: 6px;
+             background: rgba(255, 255, 255, 0.06);
+             color: #cbd5e1;
+         }
+
+         .stat-kpi-strip {
+             display: grid;
+             grid-template-columns: repeat(3, 1fr);
+             gap: 12px;
+             padding: 14px 0;
+             border-top: 1px solid var(--border-subtle);
+             border-bottom: 1px solid var(--border-subtle);
+             font-family: 'JetBrains Mono', monospace;
+         }
+
+         .stat-kpi-label {
+             font-size: 10px;
+             color: var(--text-muted);
+             text-transform: uppercase;
+         }
+
+         .stat-kpi-value {
+             font-size: 14.5px;
+             font-weight: 500;
+             color: #ffffff;
+             margin-top: 3px;
+         }
+
+         .stat-card-body {
+             font-size: 13.5px;
+             color: #cbd5e1;
+             line-height: 1.7;
+         }
+    </style>
+</head>
+<body>
+
+    <!-- ANIMATED DEEP SPACE CANVAS (TWINKLING STARS, NEBULAE, METEORS & ORBITAL NODES) -->
+    <canvas id="spaceCanvas"></canvas>
+    <div class="grid-overlay"></div>
+
+    <!-- STICKY TOP NAVBAR -->
+    <header class="navbar">
+        <a href="#top" class="brand">
+            <div class="brand-orb"></div>
+            <span class="brand-title">AETHERA</span>
+        </a>
+
+        <nav class="nav-links">
+            <a href="#top" class="nav-anchor">Mission Banner</a>
+            <a href="#globeSection" class="nav-anchor">3D Earth Observatory</a>
+            <a href="#analysisSection" class="nav-anchor">Time-Series &amp; Trends</a>
+        </nav>
+
+        <a href="#globeSection" class="nav-cta">Launch 3D Globe ↓</a>
+    </header>
+
+    <!-- ===================================================================
+         SECTION 1: MONUMENTAL CENTERED SPACE BANNER + PANORAMIC TELEMETRY HUD
+         =================================================================== -->
+    <section class="hero-banner" id="top">
+        <div class="center-banner-frame">
+            <div class="banner-orbit-ring-1"></div>
+            <div class="banner-orbit-ring-2"></div>
+            <div class="banner-horizon-glow"></div>
+
+            <div class="mission-eyebrow">
+                <span class="eyebrow-pulse"></span>
+                <span>NASA Space Apps Challenge · Earth Systems Trend Detective</span>
+            </div>
+
+            <h1 class="hero-display-title">AETHERA</h1>
+            <div class="hero-display-subtitle">Planetary Systems &amp; Climate Trend Observatory</div>
+
+            <p class="hero-description">
+                An interactive orbital analytics platform engineered to detect, quantify, and compare multi-year environmental shifts across contrasting Earth sectors using NASA satellite observations and atmospheric reanalysis models.
+            </p>
+
+            <div class="hero-actions">
+                <a href="#globeSection" class="btn-primary-launch">
+                    <span>Explore Interactive 3D Earth</span>
+                    <span>↓</span>
+                </a>
+                <a href="#analysisSection" class="btn-secondary-link">
+                    <span>Inspect Statistical Trends</span>
+                </a>
+            </div>
+
+            <!-- Panoramic Horizontal Telemetry HUD Ribbon -->
+            <div class="telemetry-hud-ribbon">
+                <div class="hud-segment">
+                    <div>
+                        <div class="hud-val">05</div>
+                        <div class="hud-lbl">Planetary Sectors</div>
+                    </div>
+                </div>
+
+                <div class="hud-divider"></div>
+
+                <div class="hud-segment">
+                    <div>
+                        <div class="hud-val">04</div>
+                        <div class="hud-lbl">NASA Core Variables</div>
+                    </div>
+                </div>
+
+                <div class="hud-divider"></div>
+
+                <div class="hud-segment">
+                    <div>
+                        <div class="hud-val">85 Months</div>
+                        <div class="hud-lbl">2018–2025 Time Series</div>
+                    </div>
+                </div>
+
+                <div class="hud-divider"></div>
+
+                <div class="hud-segment">
+                    <div>
+                        <div class="hud-val" style="font-size:16px; color:#38bdf8;">MERRA-2 · GLDAS · AIRS</div>
+                        <div class="hud-lbl">Active Satellite Missions</div>
+                    </div>
+                </div>
+
+                <div class="hud-divider"></div>
+
+                <div class="hud-live-box">
+                    <span class="hud-live-status">ORBITAL TELEMETRY ONLINE</span>
+                    <span class="hud-clock" id="utcClock">UTC 2026.11.14 // SYNCED</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Three Pillars: About This Research, Who We Are, What We Do -->
+        <div class="pillars-grid">
+            <div class="pillar-card">
+                <div class="pillar-num">01 // About This Research</div>
+                <h2 class="pillar-title">Why Regional Trends Diverge</h2>
+                <p class="pillar-desc">
+                    Global climate averages conceal sharp regional contrasts: while one sector warms or dries rapidly, another experiences shifting monsoon dynamics or wind regimes. We analyze 85-month NASA time series (2018–2025) across five distinct climatic zones.
+                </p>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-num">02 // Who We Are</div>
+                <h2 class="pillar-title">Aerospace &amp; Earth Science Team</h2>
+                <p class="pillar-desc">
+                    A student research team focused on aerospace engineering, atmospheric physics, and applied mathematical modeling—bridging satellite remote sensing with intuitive, transparent scientific visualization.
+                </p>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-num">03 // What We Do</div>
+                <h2 class="pillar-title">Statistical Detection &amp; 3D Mapping</h2>
+                <p class="pillar-desc">
+                    We process NASA Giovanni datasets (MERRA-2, GLDAS Noah, and Aqua AIRS), compute linear regression slopes and Mann-Kendall significance tests, and project regional findings onto an interactive 3D Earth model.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================================================================
+         SECTION 2: INTERACTIVE 3D EARTH MODEL WITH DOCKED CONTROLS
+         =================================================================== -->
+    <section class="observatory-section" id="globeSection">
+        <div class="explorer-toolbar">
+            <div class="region-tabs" id="regionTabs"></div>
+
+            <div class="view-modes">
+                <button class="view-btn active" onclick="switchGlobeView('satellite', this)">Satellite</button>
+                <button class="view-btn" onclick="switchGlobeView('night', this)">Night Lights</button>
+                <button class="view-btn" onclick="switchGlobeView('thermal', this)">Data Layer</button>
+            </div>
+        </div>
+
+        <div class="globe-grid">
+            <!-- Left Controls -->
+            <div class="control-column">
+                <div>
+                    <div class="sector-tag" id="heroEyebrow">Sector 01 · Eastern Europe &amp; Black Sea</div>
+                    <h2 class="active-region-heading" id="heroTitle">Ukraine</h2>
+                </div>
+
+                <div class="meta-strip">
+                    <div>Bounding Box: <b id="metaBbox">30°E – 40°E, 42°N – 52°N (incl. Crimea)</b></div>
+                    <div>Data Source: <b id="metaSource">85 Monthly Records (NASA CSV)</b></div>
+                </div>
+
+                <div class="params-group-label">Select Earth Variables (Multi-Overlay)</div>
+                <div class="params-stack" id="paramsList"></div>
+
+                <div class="bottom-tools-row">
+                    <a href="#analysisSection" class="tool-link">
+                        <span>View Time-Series Charts</span>
+                        <span>↓</span>
+                    </a>
+                    <label class="tool-link" title="Import additional NASA Giovanni CSV files">
+                        <span>+ Import CSV</span>
+                        <input type="file" accept=".csv" multiple style="display:none;" onchange="handleCsvUpload(this.files)">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Center 3D Globe with Controls Docked Directly Above & Below Sphere -->
+            <div class="globe-stage" id="globeStage">
+                <div class="orbit-ring-inner"></div>
+                <div class="orbit-ring-outer"></div>
+                <div id="globeViz"></div>
+
+                <!-- Centered Top Scale Bar right above the Globe -->
+                <div class="surface-legend">
+                    <span id="legendParam" style="color:#ffffff; font-weight:500;">LAYER: T10M (K)</span>
+                    <span id="legendMission" style="color:#38bdf8;">MERRA-2</span>
+                    <div class="legend-gradient"></div>
+                    <div class="legend-ticks" id="legendTicks">
+                        <span>266 K</span><span>280 K</span><span>292 K</span><span>304 K</span>
+                    </div>
+                </div>
+
+                <!-- Centered Bottom Control Dock right beneath the Globe -->
+                <div class="orbit-controls-dock">
+                    <button class="dock-btn active-dock" id="rotBtn" onclick="toggleSpin()">Pause Orbit</button>
+                    <div class="dock-sep"></div>
+                    <div class="dock-slider-item">
+                        <span>Speed</span>
+                        <input type="range" min="0" max="1.6" step="0.05" value="0.35" oninput="setOrbitSpeed(this.value)">
+                    </div>
+                    <div class="dock-sep"></div>
+                    <div class="dock-slider-item">
+                        <span>Clouds</span>
+                        <input type="range" min="0" max="1" step="0.05" value="0.7" oninput="setCloudOpacity(this.value)">
+                    </div>
+                    <div class="dock-sep"></div>
+                    <div class="dock-slider-item">
+                        <span>Atmo Glow</span>
+                        <input type="range" min="0.05" max="0.35" step="0.01" value="0.18" oninput="setAtmoGlow(this.value)">
+                    </div>
+                    <div class="dock-sep"></div>
+                    <button class="dock-btn active-dock" id="satBtn" onclick="toggleSatellites()">3D Orbits</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================================================================
+         SECTION 3: TIME-SERIES CHARTS & STATISTICAL INTERPRETATION
+         =================================================================== -->
+    <section class="analysis-section" id="analysisSection">
+
+        <div class="dossier-card">
+            <div>
+                <div class="sector-tag" id="storyIndex">Regional Dossier · 01</div>
+                <h2 class="dossier-title" id="storyHeading">Ukraine</h2>
+            </div>
+            <p class="dossier-text" id="storyParagraph"></p>
+            <div class="dossier-finding">
+                <div class="params-group-label">Key Statistical Finding</div>
+                <p id="storyKeyFinding" style="font-size:13.5px; color:#f1f5f9;"></p>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <div>
+                    <h3 id="chartMainTitle">NASA Time Series &amp; Linear Trends (2018–2025)</h3>
+                    <p>Solid curves show monthly NASA observations; dashed lines show linear regression trends (polyfit)</p>
+                </div>
+
+                <div class="pill-toggles">
+                    <button class="pill-toggle" id="btnAnnual" onclick="toggleOption('annual')">Annual Mean (2018–2024)</button>
+                    <button class="pill-toggle" id="btnUnits" onclick="toggleOption('units')">Metric Units (°C, mm/day, ppm)</button>
+                    <button class="pill-toggle active" id="btnNorm" onclick="toggleOption('norm')">Normalized Scale (Z-Score)</button>
+                </div>
+            </div>
+
+            <div id="mainChart" style="width:100%; height:460px;"></div>
+        </div>
+
+        <div class="cards-grid" id="explanationsGrid"></div>
+
+    </section>
+
+    <script>
+        // =========================================================================
+        // 1. ANIMATED DEEP-SPACE BACKGROUND (NEBULAE, TWINKLING STARS, METEORS, SATELLITE NODES)
+        // =========================================================================
+        (function initDeepSpaceCanvas() {
+            const canvas = document.getElementById('spaceCanvas');
+            const ctx = canvas.getContext('2d');
+            let w = 0, h = 0;
+            let stars = [], meteors = [], satNodes = [];
+
+            function resize() {
+                w = canvas.width = window.innerWidth;
+                h = canvas.height = window.innerHeight;
+
+                stars = Array.from({ length: 190 }, () => ({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    r: Math.random() * 1.4 + 0.25,
+                    baseAlpha: Math.random() * 0.55 + 0.2,
+                    phase: Math.random() * Math.PI * 2,
+                    speed: Math.random() * 0.025 + 0.008,
+                    drift: Math.random() * 0.08 + 0.02,
+                    hue: Math.random() > 0.7 ? 200 : (Math.random() > 0.5 ? 260 : 45)
+                }));
+
+                satNodes = Array.from({ length: 14 }, () => ({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    vx: (Math.random() - 0.5) * 0.35,
+                    vy: (Math.random() - 0.5) * 0.35
+                }));
+            }
+
+            function spawnMeteor() {
+                if (meteors.length < 2 && Math.random() < 0.018) {
+                    meteors.push({
+                        x: Math.random() * w * 0.9 + w * 0.1,
+                        y: Math.random() * h * 0.4,
+                        len: 90 + Math.random() * 70,
+                        speed: 9 + Math.random() * 6,
+                        alpha: 1.0
+                    });
+                }
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, w, h);
+
+                // Subtle drifting cosmic nebulae
+                const neb1 = ctx.createRadialGradient(w * 0.22, h * 0.28, 10, w * 0.22, h * 0.28, w * 0.42);
+                neb1.addColorStop(0, 'rgba(28, 64, 128, 0.11)');
+                neb1.addColorStop(1, 'rgba(3, 5, 10, 0)');
+                ctx.fillStyle = neb1;
+                ctx.fillRect(0, 0, w, h);
+
+                const neb2 = ctx.createRadialGradient(w * 0.78, h * 0.65, 10, w * 0.78, h * 0.65, w * 0.38);
+                neb2.addColorStop(0, 'rgba(88, 28, 135, 0.08)');
+                neb2.addColorStop(1, 'rgba(3, 5, 10, 0)');
+                ctx.fillStyle = neb2;
+                ctx.fillRect(0, 0, w, h);
+
+                // Twinkling stars
+                stars.forEach(s => {
+                    s.phase += s.speed;
+                    s.y -= s.drift;
+                    if (s.y < 0) s.y = h;
+                    const alpha = s.baseAlpha + Math.sin(s.phase) * 0.22;
+                    ctx.fillStyle = `hsla(${s.hue}, 80%, 88%, ${Math.max(0.05, alpha)})`;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // Faint orbital telemetry constellation nodes
+                satNodes.forEach((n, idx) => {
+                    n.x += n.vx;
+                    n.y += n.vy;
+                    if (n.x < 0 || n.x > w) n.vx *= -1;
+                    if (n.y < 0 || n.y > h) n.vy *= -1;
+
+                    ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
+                    ctx.beginPath();
+                    ctx.arc(n.x, n.y, 1.6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    for (let j = idx + 1; j < satNodes.length; j++) {
+                        const m = satNodes[j];
+                        const dist = Math.hypot(n.x - m.x, n.y - m.y);
+                        if (dist < 180) {
+                            ctx.strokeStyle = `rgba(56, 189, 248, ${(1 - dist / 180) * 0.08})`;
+                            ctx.lineWidth = 0.8;
+                            ctx.beginPath();
+                            ctx.moveTo(n.x, n.y);
+                            ctx.lineTo(m.x, m.y);
+                            ctx.stroke();
+                        }
+                    }
+                });
+
+                // Shooting stars / meteors
+                spawnMeteor();
+                for (let i = meteors.length - 1; i >= 0; i--) {
+                    const m = meteors[i];
+                    m.x -= m.speed;
+                    m.y += m.speed * 0.55;
+                    m.alpha -= 0.022;
+
+                    if (m.alpha <= 0) {
+                        meteors.splice(i, 1);
+                        continue;
+                    }
+                    const tailX = m.x + m.len;
+                    const tailY = m.y - m.len * 0.55;
+                    const grad = ctx.createLinearGradient(m.x, m.y, tailX, tailY);
+                    grad.addColorStop(0, `rgba(125, 211, 252, ${m.alpha})`);
+                    grad.addColorStop(1, 'rgba(125, 211, 252, 0)');
+                    ctx.strokeStyle = grad;
+                    ctx.lineWidth = 1.6;
+                    ctx.beginPath();
+                    ctx.moveTo(m.x, m.y);
+                    ctx.lineTo(tailX, tailY);
+                    ctx.stroke();
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            window.addEventListener('resize', resize);
+            resize();
+            animate();
+        })();
+
+        // Live UTC Mission Clock in Banner Telemetry Ribbon
+        setInterval(() => {
+            const now = new Date();
+            const utcStr = now.toISOString().replace('T', ' // ').slice(0, 22) + ' UTC';
+            const el = document.getElementById('utcClock');
+            if (el) el.textContent = utcStr;
+        }, 1000);
+
+        // =========================================================================
+        // 2. NASA GIOVANNI DATASETS (UKRAINE, TEXAS, NEPAL + MODEL PROFILES)
+        // =========================================================================
+        const GIOVANNI_DATES = ["2018-01", "2018-02", "2018-03", "2018-04", "2018-05", "2018-06", "2018-07", "2018-08", "2018-09", "2018-10", "2018-11", "2018-12", "2019-01", "2019-02", "2019-03", "2019-04", "2019-05", "2019-06", "2019-07", "2019-08", "2019-09", "2019-10", "2019-11", "2019-12", "2020-01", "2020-02", "2020-03", "2020-04", "2020-05", "2020-06", "2020-07", "2020-08", "2020-09", "2020-10", "2020-11", "2020-12", "2021-01", "2021-02", "2021-03", "2021-04", "2021-05", "2021-06", "2021-07", "2021-08", "2021-09", "2021-10", "2021-11", "2021-12", "2022-01", "2022-02", "2022-03", "2022-04", "2022-05", "2022-06", "2022-07", "2022-08", "2022-09", "2022-10", "2022-11", "2022-12", "2023-01", "2023-02", "2023-03", "2023-04", "2023-05", "2023-06", "2023-07", "2023-08", "2023-09", "2023-10", "2023-11", "2023-12", "2024-01", "2024-02", "2024-03", "2024-04", "2024-05", "2024-06", "2024-07", "2024-08", "2024-09", "2024-10", "2024-11", "2024-12", "2025-01"];
+
+        const UKRAINE_CSV_DATA = {
+            temp: [273.73, 273.44, 275.03, 284.86, 291.3, 294.91, 297.4, 297.84, 292.74, 286.98, 277.66, 273.8, 272.47, 274.67, 277.94, 283.53, 290.35, 296.96, 295.78, 296.12, 291.62, 286.78, 281.1, 277.94, 275.28, 275.94, 280.17, 282.04, 287.33, 294.77, 297.14, 296.41, 293.83, 288.93, 279.56, 275.29, 274.45, 272.4, 276.09, 281.85, 288.62, 293.47, 298.39, 297.67, 289.78, 283.84, 280.54, 275.87, 273.38, 275.89, 275.18, 283.06, 287.22, 294.64, 296.17, 298.47, 290.62, 285.98, 280.28, 276.45, 274.61, 273.87, 279.06, 283.39, 288.1, 293.23, 296.26, 298.06, 293.4, 287.02, 281.65, 276.74, 273.25, 276.72, 278.74, 286.95, 288.28, 295.96, 299.52, 298.1, 294.75, 286.75, 278.97, 276.21, 276.82],
+            rain: [3.02e-05, 2.78e-05, 4.21e-05, 9e-06, 1.27e-05, 2.13e-05, 3.88e-05, 3e-06, 2.28e-05, 1.14e-05, 1.5e-05, 3.99e-05, 3.55e-05, 1.27e-05, 1.57e-05, 1.86e-05, 2.67e-05, 1.6e-05, 2.48e-05, 1.45e-05, 1.09e-05, 1.31e-05, 1.48e-05, 1.96e-05, 1.87e-05, 3.92e-05, 9.6e-06, 7.8e-06, 3.75e-05, 2.5e-05, 2.25e-05, 2.45e-05, 1.21e-05, 1.45e-05, 1.59e-05, 1.84e-05, 4e-05, 3.42e-05, 1.79e-05, 2.27e-05, 2.69e-05, 4.61e-05, 2.73e-05, 2.88e-05, 2.11e-05, 4.4e-06, 2.08e-05, 3.78e-05, 3.06e-05, 2.13e-05, 1.72e-05, 2.94e-05, 1.69e-05, 2.33e-05, 2.29e-05, 2.18e-05, 3.13e-05, 3.39e-05, 2.54e-05, 3.44e-05, 1.14e-05, 2.58e-05, 2.1e-05, 3.65e-05, 1.75e-05, 2.27e-05, 3.18e-05, 1.43e-05, 4.9e-06, 2.55e-05, 5.58e-05, 3.82e-05, 3.98e-05, 2.18e-05, 1.52e-05, 1.37e-05, 1.04e-05, 2.6e-05, 1.19e-05, 8.3e-06, 7.4e-06, 2.11e-05, 2.27e-05, 2.46e-05, 1.31e-05],
+            wind: [7.24, 7.11, 7.13, 6.56, 5.69, 5.32, 4.88, 5.69, 6.32, 6.34, 6.55, 6.89, 7.1, 6.98, 6.89, 5.75, 5.62, 5.47, 4.87, 5.76, 6.11, 5.18, 7.21, 6.65, 6.84, 8.07, 7.27, 6.76, 5.99, 5.35, 5.29, 5.42, 6.15, 6.14, 5.88, 7.06, 7.43, 7.12, 6.78, 5.86, 6.08, 5.47, 5.25, 5.26, 6.0, 6.72, 6.74, 7.19, 8.41, 7.13, 7.28, 7.05, 6.04, 5.34, 5.33, 5.91, 6.13, 6.56, 6.29, 7.16, 7.22, 8.01, 6.85, 6.7, 5.49, 5.6, 5.63, 5.51, 5.91, 6.91, 8.31, 7.75, 7.5, 7.67, 6.11, 6.59, 5.94, 5.39, 5.56, 5.26, 6.85, 5.97, 6.85, 7.31, 6.7],
+            o3: [24.31, 28.16, 36.96, 43.4, 44.47, 41.66, 37.91, 38.89, 33.98, 29.38, 26.25, 22.63, 24.66, 27.91, 36.97, 44.83, 45.13, 41.56, 38.84, 38.78, 34.3, 29.09, 26.26, 22.49, 24.43, 28.04, 36.76, 43.72, 44.87, 40.54, 36.89, 38.6, 32.81, 28.93, 26.25, 22.23, 24.38, 28.02, 36.93, 43.93, 44.56, 41.25, 37.6, 38.7, 34.75, 29.96, 26.33, 22.91, 25.01, 28.02, 36.95, 43.25, 45.34, 41.16, 38.06, 38.79, 34.67, 29.68, 26.23, 22.41, 24.25, 27.96, 37.03, 44.16, 45.2, 41.76, 38.05, 37.94, 33.88, 29.78, 26.86, 22.57, 24.86, 28.11, 37.42, 44.04, 47.72, 41.74, 37.96, 39.35, 34.56, 29.95, 26.42, 22.5, 24.27]
+        };
+
+        const TEXAS_CSV_DATA = {
+            temp: [279.79, 285.0, 289.07, 290.03, 298.64, 301.71, 302.54, 301.62, 298.62, 292.87, 284.83, 283.02, 281.46, 284.24, 286.3, 291.75, 296.24, 299.47, 301.15, 302.76, 301.47, 292.82, 285.68, 284.28, 283.94, 283.52, 290.5, 291.71, 295.91, 299.87, 302.0, 301.9, 297.36, 292.42, 289.32, 283.08, 282.01, 279.75, 288.65, 291.2, 295.13, 299.68, 300.79, 301.55, 299.66, 295.1, 287.69, 288.73, 281.31, 281.8, 287.59, 293.02, 298.04, 301.72, 304.2, 302.03, 299.45, 293.68, 286.63, 283.56, 284.55, 285.05, 288.84, 291.71, 296.44, 301.14, 303.28, 304.5, 301.15, 294.18, 287.65, 284.79, 280.13, 286.51, 289.34, 293.41, 298.1, 301.34, 301.76, 303.17, 299.2, 296.43, 290.28, 285.73, 279.76],
+            rain: [1.49e-05, 5.27e-05, 2.9e-05, 2.49e-05, 2.98e-05, 3.01e-05, 2.71e-05, 3.14e-05, 6.45e-05, 6.8e-05, 2.01e-05, 4.62e-05, 2.63e-05, 2.57e-05, 1.81e-05, 5.14e-05, 7.38e-05, 5.12e-05, 1.96e-05, 2.96e-05, 2.41e-05, 3.94e-05, 2.17e-05, 1.32e-05, 3.69e-05, 2.8e-05, 4.81e-05, 3.79e-05, 5.09e-05, 3.31e-05, 3.62e-05, 2.57e-05, 4.05e-05, 2.21e-05, 1.74e-05, 3.16e-05, 1.89e-05, 2.05e-05, 3.22e-05, 4.3e-05, 7.84e-05, 4.52e-05, 4.34e-05, 3e-05, 2.43e-05, 3.16e-05, 1.58e-05, 1.43e-05, 1.72e-05, 2.23e-05, 3.36e-05, 2.54e-05, 4.2e-05, 2.2e-05, 2.07e-05, 4.77e-05, 1.45e-05, 2.6e-05, 3.62e-05, 2.78e-05, 2.89e-05, 2.41e-05, 2.87e-05, 4.41e-05, 4.13e-05, 3.06e-05, 2.64e-05, 1.54e-05, 2.64e-05, 4.1e-05, 2.15e-05, 2.05e-05, 4.6e-05, 1.96e-05, 3.39e-05, 5.32e-05, 6.6e-05, 3.94e-05, 4.67e-05, 1.76e-05, 2.54e-05, 6.8e-06, 4.73e-05, 3.23e-05, 2.59e-05],
+            wind: [6.76, 6.7, 7.03, 7.08, 5.88, 6.29, 4.65, 5.28, 4.84, 6.01, 6.35, 6.73, 6.41, 6.69, 6.69, 7.15, 6.76, 5.5, 5.62, 4.96, 5.72, 6.4, 6.2, 6.14, 6.58, 6.83, 6.69, 6.57, 6.29, 6.15, 5.44, 5.1, 5.76, 6.26, 6.42, 6.57, 6.47, 6.61, 7.32, 6.87, 6.52, 5.41, 4.69, 5.11, 5.34, 6.16, 6.09, 6.61, 6.69, 6.87, 7.22, 7.8, 6.9, 5.56, 5.39, 4.9, 4.72, 5.82, 6.34, 6.21, 6.87, 6.97, 7.15, 6.7, 4.99, 4.93, 5.12, 5.22, 4.87, 6.34, 5.81, 6.28, 6.49, 6.97, 6.54, 7.31, 6.1, 5.79, 4.94, 4.74, 5.11, 5.95, 6.51, 6.17, 6.47],
+            o3: [30.89, 33.06, 41.3, 45.53, 46.85, 43.05, 38.96, 37.84, 38.89, 34.23, 32.29, 29.07, 29.8, 32.78, 40.75, 45.88, 45.87, 43.78, 38.37, 37.44, 39.23, 34.63, 31.18, 29.09, 30.31, 33.61, 40.17, 44.8, 46.94, 43.27, 37.48, 37.16, 38.71, 34.26, 30.68, 29.04, 30.55, 32.95, 40.29, 44.5, 46.02, 43.33, 38.5, 37.64, 39.69, 35.12, 32.16, 28.53, 30.78, 34.01, 41.84, 44.57, 45.68, 43.65, 38.22, 37.56, 39.5, 35.27, 31.2, 28.27, 30.36, 32.9, 40.54, 45.46, 46.44, 43.7, 37.97, 37.4, 39.41, 34.99, 31.51, 29.8, 30.33, 34.13, 41.51, 45.71, 46.59, 42.95, 38.33, 37.64, 39.15, 34.96, 31.37, 28.47, 31.25]
+        };
+
+        const NEPAL_CSV_DATA = {
+            temp: [275.66, 278.99, 283.14, 286.6, 289.22, 292.16, 291.8, 291.03, 289.1, 283.95, 280.64, 275.95, 274.9, 276.99, 280.89, 287.25, 289.79, 292.11, 291.21, 291.1, 289.09, 284.75, 281.12, 274.46, 273.35, 276.03, 280.74, 285.26, 288.37, 290.48, 291.16, 291.13, 289.79, 286.53, 280.3, 276.76, 276.62, 278.92, 283.56, 286.4, 288.77, 290.65, 291.53, 290.92, 289.14, 285.77, 279.75, 275.89, 274.11, 275.02, 284.07, 288.14, 290.01, 291.93, 292.13, 291.6, 289.27, 284.91, 280.48, 277.24, 275.96, 279.24, 282.41, 286.16, 288.55, 292.24, 291.89, 291.32, 289.65, 285.29, 281.62, 277.57, 275.12, 277.2, 282.24, 287.64, 290.29, 292.73, 292.41, 290.91, 290.25, 286.31, 281.52, 277.02, 277.01],
+            rain: [4e-07, 2.8e-06, 6.1e-06, 2.32e-05, 3.59e-05, 5.47e-05, 9.21e-05, 8.4e-05, 4.06e-05, 5.8e-06, 5e-07, 3.2e-06, 3.7e-06, 1.44e-05, 7.9e-06, 1.9e-05, 2.63e-05, 4.12e-05, 0.0001081, 6.82e-05, 7.68e-05, 1.52e-05, 2.6e-06, 6e-06, 7.9e-06, 7.2e-06, 1.43e-05, 2.52e-05, 4.27e-05, 8.46e-05, 0.0001095, 6.95e-05, 7.02e-05, 1.58e-05, 1.3e-06, 3e-07, 9e-07, 1.7e-06, 4.5e-06, 9.5e-06, 5.67e-05, 8.65e-05, 8.78e-05, 8.82e-05, 5.37e-05, 3.98e-05, 1.3e-06, 7e-06, 6.9e-06, 1.3e-05, 6.9e-06, 2.09e-05, 4.19e-05, 7.72e-05, 6.05e-05, 7.38e-05, 5.91e-05, 3.72e-05, 3e-07, 3e-07, 1e-06, 1.4e-06, 1.66e-05, 1.13e-05, 2.01e-05, 6.14e-05, 7.17e-05, 9.21e-05, 5.19e-05, 2.44e-05, 1.9e-06, 4.1e-06, 1.7e-06, 5.5e-06, 1.23e-05, 4.6e-06, 3.02e-05, 7.47e-05, 0.0001022, 8.61e-05, 7.54e-05, 1.67e-05, 6e-07, 6e-07, 7e-07],
+            wind: [6.06, 5.88, 5.26, 4.86, 5.25, 4.96, 4.85, 4.15, 4.43, 4.28, 4.92, 5.09, 5.5, 6.25, 5.88, 4.81, 5.67, 5.45, 4.92, 4.3, 4.26, 4.2, 4.94, 5.0, 5.55, 4.9, 5.41, 4.84, 4.82, 5.16, 4.75, 4.59, 4.45, 4.53, 4.91, 5.89, 5.81, 4.79, 5.53, 5.73, 5.3, 5.11, 4.69, 4.56, 4.25, 4.7, 4.74, 4.85, 5.02, 5.79, 5.21, 5.34, 4.71, 5.15, 4.68, 4.61, 4.34, 4.44, 4.87, 5.21, 5.95, 5.85, 4.69, 5.4, 5.32, 5.33, 4.76, 4.61, 4.49, 4.24, 3.75, 4.69, 4.22, 6.28, 5.84, 6.41, 5.07, 5.01, 4.77, 4.31, 4.34, 4.41, 4.36, 5.73, 5.82],
+            o3: [30.32, 33.01, 38.89, 41.16, 40.11, 33.65, 25.84, 25.62, 32.87, 32.02, 30.49, 29.45, 29.86, 31.88, 37.7, 40.73, 38.98, 33.6, 26.01, 25.75, 32.71, 31.61, 30.32, 29.48, 30.29, 33.39, 38.85, 41.34, 39.91, 33.4, 27.17, 24.01, 32.27, 31.26, 30.78, 29.35, 29.82, 33.39, 37.68, 40.42, 40.06, 32.97, 27.09, 26.96, 32.58, 31.93, 30.88, 30.03, 30.59, 33.63, 38.66, 40.07, 39.61, 31.99, 27.34, 26.88, 32.78, 31.53, 30.55, 29.6, 30.03, 32.65, 38.01, 40.94, 39.87, 32.31, 27.18, 26.36, 32.42, 31.99, 30.95, 29.97, 30.85, 33.04, 38.44, 42.88, 41.11, 32.85, 25.86, 26.16, 32.43, 31.54, 30.75, 29.77, 30.22]
+        };
+
+        const REGIONS = {
+            "Ukraine": {
+                idx: "01", sector: "Sector 01 · Eastern Europe & Black Sea", iso: "UKR",
+                bboxStr: "30°E – 40°E, 42°N – 52°N (incl. Crimea)", sourceTag: "85 Monthly Records (NASA CSV)",
+                lat: 47.8, lon: 34.0, alt: 1.48, color: "#38bdf8",
+                story: "Observations across Ukraine—including the Crimean Peninsula and the northern Black Sea basin (30°E–40°E, 42°N–52°N, 2018–2025)—reveal a clear latitudinal thermal gradient from 279.9 K in the north to 290.1 K over the Crimean coast. Surface wind speeds average 6.40 m/s with winter peaks reaching 8.41 m/s.",
+                finding: "Across complete calendar years (2018–2024), annual mean 10-meter air temperature rose from 284.97 K (+11.82 °C) to 286.18 K (+13.03 °C), accompanied by an upward wind speed trend of +0.056 m/s per year.",
+                customSeries: UKRAINE_CSV_DATA
+            },
+            "Texas": {
+                idx: "02", sector: "Sector 02 · Southern Plains USA", iso: "USA",
+                bboxStr: "101°W – 91°W, 27°N – 37°N", sourceTag: "85 Monthly Records (NASA CSV)",
+                lat: 32.0, lon: -96.0, alt: 1.55, color: "#f97316",
+                story: "Satellite and reanalysis measurements for the Texas sector (101°W–91°W, 27°N–37°N) show a high thermal baseline averaging 292.69 K (+19.54 °C), peaking at 304.50 K (+31.35 °C) during summer heatwaves. Near-surface ozone increases eastward from 29.05 to 38.60 ppbv.",
+                finding: "Removing seasonal cycles reveals a statistically significant warming trend of +0.255 K/year (p = 0.0048) alongside declining precipitation rates during the 2022–2023 drought.",
+                customSeries: TEXAS_CSV_DATA
+            },
+            "Nepal": {
+                idx: "03", sector: "Sector 03 · Central & Eastern Himalaya", iso: "NPL",
+                bboxStr: "81.5°E – 91.5°E, 23°N – 33°N", sourceTag: "85 Monthly Records (NASA CSV)",
+                lat: 28.0, lon: 86.5, alt: 1.5, color: "#a855f7",
+                story: "Spanning the dramatic elevation gradient from the Terai plains to the Tibetan Plateau (81.5°E–91.5°E, 23°N–33°N), this sector exhibits extreme monsoon seasonality. Rainfall surges from near-zero winter baselines (2.8e-7 kg/m²s) to intense July–August peaks exceeding 1.09e-4 kg/m²s (9.46 mm/day).",
+                finding: "Surface wind speeds average 5.01 m/s with strong pre-monsoon gusts up to 6.41 m/s, while annual mean air temperature shows a steady upward trajectory of +0.124 K/year between 2018 and 2024.",
+                customSeries: NEPAL_CSV_DATA
+            },
+            "Australia": {
+                idx: "04", sector: "Sector 04 · Southern Arid Continent", iso: "AUS",
+                bboxStr: "113°E – 153.5°E, 39°S – 11°S", sourceTag: "MERRA-2 Reanalysis Series",
+                lat: -25.3, lon: 133.8, alt: 1.7, color: "#eab308",
+                story: "Located in the Southern Hemisphere with an inverted seasonal phase (austral summer temperature maxima in December–February), the Australian interior is characterized by low mean precipitation rates and persistent boundary-layer winds.",
+                finding: "A sustained warming slope of +0.21 K/year coincides with arid moisture deficits and low background tropospheric ozone concentrations (26–32 ppbv).",
+                profile: { tempMean: 294.8, tempAmp: 6.9, tempSlope: 0.018, rainMean: 1.75e-5, rainAmp: 0.95e-5, rainSlope: -0.012e-6, windMean: 6.45, windAmp: 0.65, windSlope: 0.002, o3Mean: 29.4, o3Amp: 3.8, o3Slope: 0.008 },
+                southHemisphere: true
+            },
+            "Antarctica": {
+                idx: "05", sector: "Sector 05 · South Polar Cryosphere", iso: "ATA",
+                bboxStr: "140°E – 180°E, 84°S – 70°S", sourceTag: "MERRA-2 Reanalysis Series",
+                lat: -76.0, lon: 155.0, alt: 1.8, color: "#2dd4bf",
+                story: "Covering East Antarctica and the Ross Sea sector, this polar region combines extreme sub-freezing 10-meter temperatures (230–255 K) with powerful katabatic outflow winds and minimal atmospheric moisture.",
+                finding: "Exhibits the highest mean surface wind speed among all five sectors (7.85 m/s) paired with distinct polar tropospheric ozone dynamics.",
+                profile: { tempMean: 241.5, tempAmp: 12.5, tempSlope: 0.015, rainMean: 0.62e-5, rainAmp: 0.25e-5, rainSlope: 0.004e-6, windMean: 7.85, windAmp: 1.15, windSlope: 0.005, o3Mean: 26.8, o3Amp: 4.2, o3Slope: -0.009 },
+                southHemisphere: true
+            }
+        };
+
+        const PARAMS = {
+            "Air Temperature (10m)": {
+                key: "temp", sub: "10m Elevation · MERRA-2", mission: "MERRA-2",
+                color: "#ff4d6d", rawUnit: "K", altUnit: "°C", checked: true,
+                ticks: ["266 K", "280 K", "292 K", "304 K"],
+                desc: "Monthly mean air temperature at 10 meters above displacement height. Annual oscillations capture seasonal solar forcing, while the linear trend line quantifies multi-year warming rates."
+            },
+            "Total Rainfall Rate": {
+                key: "rain", sub: "Surface Flux · GLDAS Noah", mission: "GLDAS v2.1",
+                color: "#38bdf8", rawUnit: "kg/(m²·s)", altUnit: "mm/day", checked: true,
+                ticks: ["0", "2e-5", "5e-5", "1e-4"],
+                desc: "Area-averaged total precipitation flux per square meter per second (multiplying by 86,400 converts to mm/day). Troughs identify drought episodes while peaks capture monsoon and cyclonic events."
+            },
+            "Surface Wind Speed": {
+                key: "wind", sub: "Boundary Layer · MERRA-2", mission: "MERRA-2",
+                color: "#10b981", rawUnit: "m/s", altUnit: "m/s", checked: false,
+                ticks: ["3.0 m/s", "4.8 m/s", "6.4 m/s", "8.4 m/s"],
+                desc: "Monthly mean scalar surface wind speed from MERRA-2 surface flux diagnostics, reflecting synoptic storm activity, pressure gradients, and seasonal circulation shifts."
+            },
+            "Tropospheric Ozone O₃": {
+                key: "o3", sub: "1000 hPa Level · Aqua AIRS", mission: "Aqua AIRS",
+                color: "#c084fc", rawUnit: "ppbv", altUnit: "ppm", checked: false,
+                ticks: ["22 ppbv", "30 ppbv", "38 ppbv", "47 ppbv"],
+                desc: "Daytime mole fraction of ozone near the surface (1000 hPa pressure level) retrieved by NASA's Aqua AIRS sounder in parts per billion by volume (1,000 ppbv = 1 ppm)."
+            }
+        };
+
+        // UNIFIED CRIMEAN PENINSULA POLYGON UNDER UKR
+        const CRIMEA_POLYGON = {
+            type: "Feature",
+            properties: { ISO_A3: "UKR", ADMIN: "Ukraine (Crimea)" },
+            geometry: {
+                type: "Polygon",
+                coordinates: [[
+                    [33.62, 46.16], [34.45, 45.98], [35.02, 45.75], [35.55, 45.32],
+                    [36.58, 45.36], [36.42, 45.02], [35.38, 44.94], [34.42, 44.41],
+                    [33.72, 44.38], [33.38, 44.58], [33.55, 44.92], [32.50, 45.35],
+                    [32.78, 45.62], [33.32, 45.88], [33.62, 46.16]
+                ]]
+            }
+        };
+
+        let currentRegion = "Ukraine";
+        let surfaceParam = "Air Temperature (10m)";
+        let currentView = "satellite";
+        let spinning = true;
+        let showSatOrbits = true;
+        let optAnnual = false;
+        let optUnits = false;
+        let optNorm = true;
+        let countriesData = [];
+        let cloudLayer = null;
+        let satOrbitGroup = null;
+        let satBeads = [];
+
+        function toggleOption(which) {
+            if (which === 'annual') {
+                optAnnual = !optAnnual;
+                document.getElementById('btnAnnual').classList.toggle('active', optAnnual);
+            } else if (which === 'units') {
+                optUnits = !optUnits;
+                document.getElementById('btnUnits').classList.toggle('active', optUnits);
+            } else if (which === 'norm') {
+                optNorm = !optNorm;
+                document.getElementById('btnNorm').classList.toggle('active', optNorm);
+            }
+            renderAll();
+        }
+
+        function getRegionSeries(regName, paramTitle, useAltUnits) {
+            const reg = REGIONS[regName];
+            const p = PARAMS[paramTitle];
+            let rawArr = [];
+
+            if (reg.customSeries && reg.customSeries[p.key]) {
+                rawArr = reg.customSeries[p.key].slice();
+            } else {
+                const prof = reg.profile;
+                const seed = parseInt(reg.idx, 10);
+                const mean = prof[p.key + "Mean"];
+                const amp = prof[p.key + "Amp"];
+                const slope = prof[p.key + "Slope"];
+                const phaseShift = reg.southHemisphere ? Math.PI : 0;
+
+                rawArr = GIOVANNI_DATES.map((dStr, i) => {
+                    const month = parseInt(dStr.split("-")[1], 10);
+                    const seasonal = -Math.cos(((month - 1) / 12) * 2 * Math.PI + phaseShift);
+                    const interannual = Math.sin(i * 0.43 + seed) * 0.22;
+                    const val = mean + slope * i + (seasonal * 0.85 + interannual) * amp;
+                    return p.key === "rain" ? Math.max(0.1e-5, +val.toExponential(4)) : +val.toFixed(2);
+                });
+            }
+
+            if (!useAltUnits) return rawArr;
+            if (p.key === "temp") return rawArr.map(v => +(v - 273.15).toFixed(2));
+            if (p.key === "rain") return rawArr.map(v => +(v * 86400).toFixed(2));
+            if (p.key === "o3") return rawArr.map(v => +(v / 1000).toFixed(5));
+            return rawArr;
+        }
+
+        function aggregateAnnual(dates, values) {
+            const byYear = {};
+            dates.forEach((dStr, idx) => {
+                const yr = parseInt(dStr.slice(0, 4), 10);
+                if (yr <= 2024) {
+                    if (!byYear[yr]) byYear[yr] = [];
+                    byYear[yr].push(values[idx]);
+                }
+            });
+            const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
+            const means = years.map(y => {
+                const arr = byYear[y];
+                return arr.reduce((a, b) => a + b, 0) / arr.length;
+            });
+            return { xLabels: years.map(String), xNumeric: years, yValues: means };
+        }
+
+        function computeTrendStats(xNum, yVals, isAnnual) {
+            const n = yVals.length;
+            const mx = xNum.reduce((a, b) => a + b, 0) / n;
+            const my = yVals.reduce((a, b) => a + b, 0) / n;
+            let num = 0, den = 0;
+            for (let i = 0; i < n; i++) {
+                num += (xNum[i] - mx) * (yVals[i] - my);
+                den += (xNum[i] - mx) ** 2;
+            }
+            const slopePerStep = num / (den || 1);
+            const intercept = my - slopePerStep * mx;
+            const trendLine = xNum.map(x => intercept + slopePerStep * x);
+            const slopePerYear = isAnnual ? slopePerStep : slopePerStep * 12;
+
+            let s = 0;
+            for (let i = 0; i < n - 1; i++) {
+                for (let j = i + 1; j < n; j++) {
+                    s += Math.sign(yVals[j] - yVals[i]);
+                }
+            }
+            const varS = (n * (n - 1) * (2 * n + 5)) / 18;
+            const z = s === 0 ? 0 : (s > 0 ? (s - 1) / Math.sqrt(varS) : (s + 1) / Math.sqrt(varS));
+            const absZ = Math.abs(z);
+            const pText = absZ > 2.58 ? "p < 0.01 (Significant)" : (absZ > 1.96 ? "p < 0.05 (Significant)" : "p > 0.05 (Seasonal Cycle)");
+
+            return { mean: my, slopePerYear, trendLine, pText };
+        }
+
+        function formatNumber(val, key, useAlt) {
+            if (key === "rain" && !useAlt) return val.toExponential(2);
+            if (key === "o3" && useAlt) return val.toFixed(4);
+            return val.toFixed(2);
+        }
+
+        function buildGiovanniMapTexture(paramTitle) {
+            const c = document.createElement('canvas');
+            c.width = 1024; c.height = 512;
+            const ctx = c.getContext('2d');
+            const g = ctx.createLinearGradient(0, 0, 0, 512);
+            const key = PARAMS[paramTitle].key;
+
+            if (key === "temp") {
+                g.addColorStop(0.0, "#1d4ed8"); g.addColorStop(0.25, "#7dd3fc");
+                g.addColorStop(0.45, "#f8fafc"); g.addColorStop(0.50, "#b91c1c");
+                g.addColorStop(0.55, "#f8fafc"); g.addColorStop(0.75, "#7dd3fc"); g.addColorStop(1.0, "#1d4ed8");
+            } else if (key === "o3") {
+                g.addColorStop(0.0, "#e0f2fe"); g.addColorStop(0.35, "#38bdf8");
+                g.addColorStop(0.50, "#0369a1"); g.addColorStop(0.65, "#38bdf8"); g.addColorStop(1.0, "#e0f2fe");
+            } else if (key === "wind") {
+                g.addColorStop(0.0, "#38bdf8"); g.addColorStop(0.3, "#bef264");
+                g.addColorStop(0.5, "#e11d48"); g.addColorStop(0.7, "#bef264"); g.addColorStop(1.0, "#38bdf8");
+            } else {
+                g.addColorStop(0.0, "#dc2626"); g.addColorStop(0.35, "#f97316");
+                g.addColorStop(0.5, "#0284c7"); g.addColorStop(0.65, "#f97316"); g.addColorStop(1.0, "#dc2626");
+            }
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, 1024, 512);
+            return c.toDataURL();
+        }
+
+        // =========================================================================
+        // 3. 3D GLOBE + 3D ORBITING SATELLITE TRACKS
+        // =========================================================================
+        const stageEl = document.getElementById('globeStage');
+        const globe = Globe()(document.getElementById('globeViz'))
+            .backgroundColor('rgba(0,0,0,0)')
+            .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+            .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+            .showAtmosphere(true)
+            .atmosphereColor('#38bdf8')
+            .atmosphereAltitude(0.18)
+            .polygonSideColor(() => 'rgba(56, 189, 248, 0.14)');
+
+        globe.controls().autoRotate = true;
+        globe.controls().autoRotateSpeed = 0.35;
+        globe.controls().enableZoom = false;
+
+        // Cloud Mesh
+        const cloudCanvas = document.createElement('canvas');
+        cloudCanvas.width = 512; cloudCanvas.height = 256;
+        const cCtx = cloudCanvas.getContext('2d');
+        for (let i = 0; i < 140; i++) {
+            const x = Math.random() * 512, y = Math.random() * 256, r = 16 + Math.random() * 40;
+            const rg = cCtx.createRadialGradient(x, y, 1, x, y, r);
+            rg.addColorStop(0, 'rgba(255,255,255,0.36)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+            cCtx.fillStyle = rg; cCtx.beginPath(); cCtx.ellipse(x, y, r, r * 0.4, 0, 0, Math.PI * 2); cCtx.fill();
+        }
+        cloudLayer = new THREE.Mesh(
+            new THREE.SphereGeometry(101.2, 64, 64),
+            new THREE.MeshPhongMaterial({ map: new THREE.CanvasTexture(cloudCanvas), transparent: true, opacity: 0.7, depthWrite: false })
+        );
+        globe.scene().add(cloudLayer);
+
+        // 3D Satellite Orbital Rings & Moving Satellite Markers around the Globe
+        satOrbitGroup = new THREE.Group();
+        const orbitConfigs = [
+            { radius: 114, tiltX: 0.95, tiltZ: 0.35, color: 0x38bdf8, speed: 0.012 },
+            { radius: 121, tiltX: -0.75, tiltZ: 0.65, color: 0xa855f7, speed: -0.009 }
+        ];
+        orbitConfigs.forEach(cfg => {
+            const ringGeo = new THREE.RingGeometry(cfg.radius, cfg.radius + 0.35, 128);
+            const ringMat = new THREE.MeshBasicMaterial({ color: cfg.color, side: THREE.DoubleSide, transparent: true, opacity: 0.26 });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.rotation.x = cfg.tiltX;
+            ringMesh.rotation.y = cfg.tiltZ;
+            satOrbitGroup.add(ringMesh);
+
+            const satGeo = new THREE.SphereGeometry(1.4, 16, 16);
+            const satMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const satMesh = new THREE.Mesh(satGeo, satMat);
+            satOrbitGroup.add(satMesh);
+            satBeads.push({ mesh: satMesh, radius: cfg.radius, tiltX: cfg.tiltX, tiltZ: cfg.tiltZ, angle: Math.random() * Math.PI * 2, speed: cfg.speed });
+        });
+        globe.scene().add(satOrbitGroup);
+
+        (function animateSceneExtras() {
+            if (cloudLayer && spinning) cloudLayer.rotation.y += 0.0005;
+            if (satOrbitGroup && showSatOrbits) {
+                satBeads.forEach(b => {
+                    b.angle += b.speed;
+                    const pos = new THREE.Vector3(Math.cos(b.angle) * b.radius, Math.sin(b.angle) * b.radius, 0);
+                    const euler = new THREE.Euler(b.tiltX, b.tiltZ, 0, 'XYZ');
+                    pos.applyEuler(euler);
+                    b.mesh.position.copy(pos);
+                });
+            }
+            requestAnimationFrame(animateSceneExtras);
+        })();
+
+        fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson')
+            .then(r => r.json())
+            .then(d => {
+                countriesData = d.features.map(f => {
+                    const props = f.properties || {};
+                    const name = (props.NAME || props.ADMIN || props.SUBUNIT || "").toLowerCase();
+                    if (name.includes("crimea") || props.ADM0_A3 === "UKR" || props.ISO_A3 === "UKR") {
+                        props.ISO_A3 = "UKR";
+                    }
+                    return f;
+                });
+                countriesData.push(CRIMEA_POLYGON);
+                renderAll();
+            })
+            .catch(() => {
+                countriesData = [CRIMEA_POLYGON];
+                renderAll();
+            });
+
+        function selectRegion(name) {
+            currentRegion = name;
+            const data = REGIONS[name];
+            globe.pointOfView({ lat: data.lat, lng: data.lon, altitude: data.alt }, 1400);
+            renderAll();
+        }
+
+        function buildControls() {
+            const nav = document.getElementById('regionTabs');
+            Object.entries(REGIONS).forEach(([name, data]) => {
+                const btn = document.createElement('button');
+                btn.className = 'region-tab' + (name === currentRegion ? ' active' : '');
+                btn.dataset.region = name;
+                btn.innerHTML = `<span class="idx">${data.idx}</span><span>${name}</span>`;
+                btn.onclick = () => selectRegion(name);
+                nav.appendChild(btn);
+            });
+
+            const pContainer = document.getElementById('paramsList');
+            Object.entries(PARAMS).forEach(([pTitle, cfg]) => {
+                const card = document.createElement('div');
+                card.className = 'param-card' + (cfg.checked ? ' selected' : '');
+                card.style.setProperty('--p-color', cfg.color);
+                card.onclick = () => {
+                    cfg.checked = !cfg.checked;
+                    if (!Object.values(PARAMS).some(p => p.checked)) cfg.checked = true;
+                    card.classList.toggle('selected', cfg.checked);
+                    renderAll();
+                };
+                card.innerHTML = `
+            <div class="param-card-left">
+              <span class="param-indicator"></span>
+              <div>
+                <div class="param-card-title">${pTitle}</div>
+                <div class="param-card-meta">${cfg.sub}</div>
+              </div>
+            </div>
+            <button class="map-layer-pill ${pTitle === surfaceParam ? 'active-layer' : ''}" onclick="setSurfaceLayer('${pTitle}', event)">Layer</button>
+          `;
+                pContainer.appendChild(card);
+            });
+        }
+
+        function setSurfaceLayer(pTitle, ev) {
+            ev.stopPropagation();
+            surfaceParam = pTitle;
+            document.querySelectorAll('.map-layer-pill').forEach(b => b.classList.remove('active-layer'));
+            ev.target.classList.add('active-layer');
+            const cfg = PARAMS[pTitle];
+            document.getElementById('legendParam').textContent = `LAYER: ${cfg.key.toUpperCase()}`;
+            document.getElementById('legendMission').textContent = cfg.mission;
+            document.getElementById('legendTicks').innerHTML = cfg.ticks.map(t => `<span>${t}</span>`).join('');
+            if (currentView === 'thermal') {
+                globe.globeImageUrl(buildGiovanniMapTexture(surfaceParam));
+            }
+        }
+
+        function switchGlobeView(mode, btn) {
+            currentView = mode;
+            document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (mode === 'satellite') {
+                globe.globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
+                if (cloudLayer) cloudLayer.visible = true;
+            } else if (mode === 'night') {
+                globe.globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg');
+                if (cloudLayer) cloudLayer.visible = false;
+            } else {
+                globe.globeImageUrl(buildGiovanniMapTexture(surfaceParam));
+                if (cloudLayer) cloudLayer.visible = false;
+            }
+        }
+
+        // Dock Controls Functions
+        function toggleSpin() {
+            spinning = !spinning;
+            globe.controls().autoRotate = spinning;
+            const btn = document.getElementById('rotBtn');
+            btn.textContent = spinning ? "Pause Orbit" : "Resume Orbit";
+            btn.classList.toggle('active-dock', spinning);
+        }
+
+        function setOrbitSpeed(v) {
+            globe.controls().autoRotateSpeed = parseFloat(v);
+        }
+
+        function setCloudOpacity(v) {
+            if (cloudLayer) cloudLayer.material.opacity = parseFloat(v);
+        }
+
+        function setAtmoGlow(v) {
+            globe.atmosphereAltitude(parseFloat(v));
+        }
+
+        function toggleSatellites() {
+            showSatOrbits = !showSatOrbits;
+            if (satOrbitGroup) satOrbitGroup.visible = showSatOrbits;
+            document.getElementById('satBtn').classList.toggle('active-dock', showSatOrbits);
+        }
+
+        function handleCsvUpload(fileList) {
+            Array.from(fileList).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const lines = e.target.result.split(/\r?\n/);
+                    let bboxLine = lines.find(l => l.startsWith("User Bounding Box")) || "";
+                    let targetRegion = currentRegion;
+                    if (bboxLine.includes("30,42") || bboxLine.includes("22,44")) targetRegion = "Ukraine";
+                    else if (bboxLine.includes("-101,27")) targetRegion = "Texas";
+                    else if (bboxLine.includes("81.5,23") || bboxLine.includes("80,26")) targetRegion = "Nepal";
+                    else if (bboxLine.includes("113,-39")) targetRegion = "Australia";
+                    else if (bboxLine.includes("140,-84")) targetRegion = "Antarctica";
+
+                    const headerIdx = lines.findIndex(l => l.startsWith("time,"));
+                    if (headerIdx === -1) return;
+                    const header = lines[headerIdx];
+                    let paramKey = "temp";
+                    if (header.includes("Rainf") || header.includes("precip")) paramKey = "rain";
+                    else if (header.includes("SPEED") || header.includes("Wind")) paramKey = "wind";
+                    else if (header.includes("O3")) paramKey = "o3";
+
+                    const vals = [];
+                    for (let i = headerIdx + 1; i < lines.length; i++) {
+                        const parts = lines[i].split(",");
+                        if (parts.length >= 2) {
+                            const v = parseFloat(parts[1]);
+                            if (!isNaN(v) && v > -9000 && v < 1e12) vals.push(v);
+                        }
+                    }
+                    if (vals.length > 0) {
+                        if (!REGIONS[targetRegion].customSeries) REGIONS[targetRegion].customSeries = {};
+                        REGIONS[targetRegion].customSeries[paramKey] = vals;
+                        REGIONS[targetRegion].sourceTag = "Custom CSV Imported";
+                        selectRegion(targetRegion);
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        function renderAll() {
+            const reg = REGIONS[currentRegion];
+            const activeParams = Object.entries(PARAMS).filter(([_, cfg]) => cfg.checked).map(([title]) => title);
+            const normalize = optNorm && activeParams.length > 1;
+
+            document.documentElement.style.setProperty('--accent', reg.color);
+            document.querySelectorAll('.region-tab').forEach(t => t.classList.toggle('active', t.dataset.region === currentRegion));
+
+            document.getElementById('heroEyebrow').textContent = reg.sector;
+            document.getElementById('heroTitle').textContent = currentRegion;
+            document.getElementById('metaBbox').textContent = reg.bboxStr;
+            document.getElementById('metaSource').textContent = reg.sourceTag;
+
+            document.getElementById('storyIndex').textContent = `Regional Dossier · ${reg.idx}`;
+            document.getElementById('storyHeading').textContent = currentRegion;
+            document.getElementById('storyParagraph').textContent = reg.story;
+            document.getElementById('storyKeyFinding').textContent = reg.finding;
+
+            globe.atmosphereColor(reg.color);
+            if (countriesData.length > 0) {
+                globe
+                    .polygonsData(countriesData)
+                    .polygonAltitude(d => d.properties.ISO_A3 === reg.iso ? 0.028 : 0.003)
+                    .polygonCapColor(d => d.properties.ISO_A3 === reg.iso ? `${reg.color}55` : 'rgba(15, 23, 42, 0.06)')
+                    .polygonStrokeColor(d => d.properties.ISO_A3 === reg.iso ? reg.color : 'rgba(255, 255, 255, 0.1)');
+            }
+
+            const allPins = Object.entries(REGIONS).map(([rName, rData]) => ({
+                name: rName, idx: rData.idx, lat: rData.lat, lng: rData.lon, color: rData.color, isActive: rName === currentRegion
+            }));
+
+            globe
+                .ringsData(allPins.filter(p => p.isActive))
+                .ringLat('lat').ringLng('lng').ringColor('color')
+                .ringMaxRadius(6.0).ringPropagationSpeed(1.6).ringRepeatPeriod(850)
+                .htmlElementsData(allPins)
+                .htmlLat('lat').htmlLng('lng')
+                .htmlAltitude(d => d.isActive ? 0.035 : 0.01)
+                .htmlElement(d => {
+                    const el = document.createElement('div');
+                    el.className = 'globe-pin';
+                    el.style.setProperty('--pin-color', d.color);
+                    el.style.opacity = d.isActive ? '1' : '0.72';
+                    el.innerHTML = `
+              <span class="globe-pin-dot"></span>
+              <span class="globe-pin-tag" style="${d.isActive ? `border-color:${d.color}; box-shadow:0 0 12px ${d.color}55;` : ''}">${d.idx} ${d.name}</span>
+            `;
+                    el.onclick = () => selectRegion(d.name);
+                    return el;
+                });
+
+            document.getElementById('chartMainTitle').textContent =
+                `NASA Time Series & Linear Trends (${optAnnual ? '2018–2024 Annual Mean' : '2018–2025 Monthly Series'}) — ${currentRegion}`;
+
+            const traces = [];
+            const expGrid = document.getElementById('explanationsGrid');
+            expGrid.innerHTML = '';
+
+            activeParams.forEach(pTitle => {
+                const cfg = PARAMS[pTitle];
+                const unitLabel = optUnits ? cfg.altUnit : cfg.rawUnit;
+                const monthlySeries = getRegionSeries(currentRegion, pTitle, optUnits);
+
+                let xLabels = GIOVANNI_DATES;
+                let xNumeric = GIOVANNI_DATES.map((_, idx) => idx + 1);
+                let yRaw = monthlySeries;
+
+                if (optAnnual) {
+                    const agg = aggregateAnnual(GIOVANNI_DATES, monthlySeries);
+                    xLabels = agg.xLabels;
+                    xNumeric = agg.xNumeric;
+                    yRaw = agg.yValues;
+                }
+
+                const stats = computeTrendStats(xNumeric, yRaw, optAnnual);
+                const sign = stats.slopePerYear > 0 ? '+' : '';
+                const slopeFormatted = formatNumber(stats.slopePerYear, cfg.key, optUnits);
+                const meanFormatted = formatNumber(stats.mean, cfg.key, optUnits);
+
+                let yPlot = yRaw;
+                if (normalize) {
+                    const std = Math.sqrt(yRaw.reduce((s, v) => s + (v - stats.mean) ** 2, 0) / yRaw.length) || 1;
+                    yPlot = yRaw.map(v => +((v - stats.mean) / std).toFixed(3));
+                }
+                const plotStats = computeTrendStats(xNumeric, yPlot, optAnnual);
+
+                traces.push({
+                    x: xLabels, y: yPlot, mode: 'lines+markers',
+                    name: `${pTitle}`,
+                    line: { color: cfg.color, width: 2.2 },
+                    marker: { size: optAnnual ? 6 : 3.5, color: cfg.color },
+                    customdata: yRaw.map(v => formatNumber(v, cfg.key, optUnits)),
+                    hovertemplate: `<b>${pTitle}</b>: %{customdata} ${unitLabel}<extra></extra>`
+                });
+
+                traces.push({
+                    x: xLabels, y: plotStats.trendLine, mode: 'lines',
+                    name: `Trend (${sign}${slopeFormatted} ${unitLabel}/yr)`,
+                    line: { color: cfg.color, width: 1.8, dash: 'dash' },
+                    hoverinfo: 'skip'
+                });
+
+                const card = document.createElement('div');
+                card.className = 'stat-detail-card';
+                card.style.setProperty('--c-color', cfg.color);
+                card.innerHTML = `
+            <div class="stat-card-top">
+              <div class="stat-card-title">${pTitle}</div>
+              <span class="stat-sensor-badge">${cfg.sub}</span>
+            </div>
+            <div class="stat-kpi-strip">
+              <div>
+                <div class="stat-kpi-label">Period Mean</div>
+                <div class="stat-kpi-value">${meanFormatted} ${unitLabel}</div>
+              </div>
+              <div>
+                <div class="stat-kpi-label">Linear Slope</div>
+                <div class="stat-kpi-value" style="color:${cfg.color};">${sign}${slopeFormatted} / yr</div>
+              </div>
+              <div>
+                <div class="stat-kpi-label">Mann-Kendall</div>
+                <div class="stat-kpi-value">${stats.pText}</div>
+              </div>
+            </div>
+            <p class="stat-card-body">${cfg.desc}</p>
+          `;
+                expGrid.appendChild(card);
+            });
+
+            Plotly.newPlot('mainChart', traces, {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { family: 'Inter, sans-serif', color: '#94a3b8', size: 11.5 },
+                xaxis: {
+                    gridcolor: 'rgba(255,255,255,0.05)',
+                    nticks: optAnnual ? 7 : 12,
+                    zeroline: false
+                },
+                yaxis: {
+                    title: normalize ? 'Normalized Deviation (Z-Score)' : 'Physical Units',
+                    gridcolor: 'rgba(255,255,255,0.05)',
+                    zerolineColor: 'rgba(255,255,255,0.1)'
+                },
+                legend: { orientation: 'h', y: 1.12, x: 0, font: { family: 'Space Grotesk, sans-serif', size: 12, color: '#f8fafc' } },
+                margin: { t: 38, b: 38, l: 54, r: 18 },
+                hovermode: 'x unified'
+            }, { responsive: true, displayModeBar: false });
+        }
+
+        function fitGlobeSize() {
+            globe.width(stageEl.clientWidth);
+            globe.height(stageEl.clientHeight);
+        }
+        window.addEventListener('resize', fitGlobeSize);
+
+        buildControls();
+        setTimeout(() => {
+            fitGlobeSize();
+            globe.pointOfView({ lat: 47.8, lng: 34.0, altitude: 1.48 });
+            renderAll();
+        }, 120);
+    </script>
+</body>
+</html>
